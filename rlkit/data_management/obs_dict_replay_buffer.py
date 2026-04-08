@@ -96,8 +96,11 @@ class ObsDictReplayBuffer(ReplayBuffer):
         self._top = 0
         self._size = 0
 
-        self._idx_to_future_obs_idx = np.ones((max_size, 2), dtype=np.int)
-        self._idx_to_num_steps = np.ones((max_size, ), dtype=np.int)
+        # original
+        # self._idx_to_future_obs_idx = np.ones((max_size, 2), dtype=np.int)
+        # self._idx_to_num_steps = np.ones((max_size, ), dtype=np.int)
+        self._idx_to_future_obs_idx = np.ones((max_size, 2), dtype=np.int64)
+        self._idx_to_num_steps = np.ones((max_size, ), dtype=np.int64)
 
         if isinstance(self.env.action_space, Discrete):
             raise NotImplementedError("TODO")

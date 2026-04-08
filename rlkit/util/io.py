@@ -20,18 +20,28 @@ def get_relative_path(filename):
     return os.path.join(LOCAL_LOG_DIR, filename)
 
 
+# def local_path_from_s3_or_local_path(filename):
+#     relative_filename = os.path.join(LOCAL_LOG_DIR, filename)
+
+#     if os.path.isfile(filename):
+#         return filename
+#     elif os.path.isfile(relative_filename):
+#         return relative_filename
+#     else:
+#         logging.warn('Cannot find the file: %r' % (filename))
+#         # exit()
+#         return sync_down(filename)
+
 def local_path_from_s3_or_local_path(filename):
-    relative_filename = os.path.join(LOCAL_LOG_DIR, filename)
-
-    if os.path.isfile(filename):
+    # Treat normal filesystem paths as local
+    if filename is None:
         return filename
-    elif os.path.isfile(relative_filename):
-        return relative_filename
-    else:
-        logging.warn('Cannot find the file: %r' % (filename))
-        # exit()
+    if isinstance(filename, str) and (filename.startswith("/") or filename.startswith("./") or filename.startswith("../")):
+        return filename
+    # Only sync if it's an s3 path
+    if isinstance(filename, str) and filename.startswith("s3://"):
         return sync_down(filename)
-
+    return filename
 
 def sync_down(path, check_exists=True):
     is_docker = os.path.isfile("/.dockerenv")

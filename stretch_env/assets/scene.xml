@@ -1,0 +1,140 @@
+<mujoco model="stretch scene">
+  <include file="stretch.xml"/>
+
+  <statistic center="0 0 .75" extent="1.2" meansize="0.05"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="2d" name="wood" file="wood.png"/>
+    <material name="wood" texture="wood"/>
+    <texture type="2d" name="metal01" file="metal01.png"/>
+    <material name="metal01" texture="metal01"/>
+    <texture type="2d" name="wallpaper" file="wallpaper.png"/>
+    <material name="wallpaper" texture="wallpaper"/>
+    <texture type="2d" name="metal02" file="metal02.png"/>
+    <material name="metal02" texture="metal02"/>
+    <texture type="2d" name="metal03" file="metal03.png"/>
+    <material name="metal03" texture="metal03"/>
+    <texture type="2d" name="wool" file="wool.png"/>
+    <material name="wool" texture="wool"/>
+    <texture type="2d" name="glass" file="glass.png"/>
+    <material name="glass" texture="glass"/>
+    <mesh name="real_table" file="desk.obj" scale="1 1 1"/>
+    <material name="real_table_material" rgba="1 1 1 1"/>
+
+    <material name="floor" rgba=".1 .1 .1 1" texture="wool"/>
+    <material name="object" rgba=".2 .2 .2 1"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.44 0.80 1.00" rgb2="1 1 1" width="512" height="3072"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="floor"/>
+    <!-- real_table -->
+    <body name="real_table" pos="-3. -3. .72">
+    <geom type="mesh" mesh="real_table" material="real_table_material"/>
+    <geom type="box" size="1 0.5 0.05" pos="0 0 0.6" rgba="0 0 0 0" contype="1" conaffinity="1"/>
+    <geom type="sphere" size="0.05" pos="0 0 0.5" rgba="1 0 0 1"/>
+    </body>
+    <!-- robot table -->
+    <body name="table" pos="-.91 -1.325 .36"> 
+      <geom type="box" size=".84 .425 .36" mass="1" material="metal01"/>
+    </body>
+    <!-- left wall -->
+    <body name ='wall1' pos ='0 1.875 1.35'>
+      <geom type = 'box' size ='2.84 .12 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <!-- right wall -->
+    <body name ='wall2' pos ='0 -1.875 1.35'>
+      <geom type = 'box' size ='2.84 .12 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <!-- front wall -->
+    <!-- <body name ='wall3' pos ='2.5 0 1.35'>
+      <geom type = 'box' size ='.12 1.75 1.35' mass='9' material ='wallpaper'/>
+    </body> -->
+    <body name ='wall3.1' pos ='2.72 1.6 1.35'>
+      <geom type = 'box' size ='.12 .15 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.2' pos ='2.72 -1.6 1.35'>
+      <geom type = 'box' size ='.12 .15 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.3' pos ='2.72 0 1.35'>
+      <geom type = 'box' size ='.12 .35 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.4' pos ='2.72 .9 .24'>
+      <geom type = 'box' size ='.12 .55 .24' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.5' pos ='2.72 -.9 .24'>
+      <geom type = 'box' size ='.12 .55 .24' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.6' pos ='2.72 .9 2.675'>
+      <geom type = 'box' size ='.12 .55 .025' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall3.7' pos ='2.72 -.9 2.675'>
+      <geom type = 'box' size ='.12 .55 .025' mass='9' material ='wallpaper'/>
+    </body>
+    <!-- back wall -->
+    <body name ='wall4.1' pos ='-2.72 -0.575 1.35'>
+      <geom type = 'box' size ='.12 1.175 1.35' mass='9' material ='wallpaper'/>
+    </body>
+    <body name ='wall4.2' pos ='-2.72 1.175 2.41'>
+      <geom type = 'box' size ='.12 .575 .29' mass='9' material ='wallpaper'/>
+    </body>
+    <!-- long table -->
+    <body name ='long_table' pos ='0.6 1.35 .375'>
+      <geom type = 'box' size ='2.0 .4 .375' mass='9' material ='wood'/>
+    </body>
+    <!-- shelf -->
+    <body name ='shelf1' pos ='-2.38 -.95 1.125'>
+      <geom type = 'box' size ='.22 .8 1.125' mass='9' material ='metal02'/>
+    </body>
+    <!-- tool table -->
+    <body name ='tool_table' pos ='1.75 -1.45 .41'>
+      <geom type = 'box' size ='.85 .3 .41' mass='9' material ='metal03'/>
+    </body>
+    <!-- tool shelf 01 -->
+    <body name ='tool_shelf01' pos ='1.75 -1.65 1.77'>
+      <geom type = 'box' size ='.85 .1 .3' mass='9' material ='metal03'/>
+    </body>
+    <!-- tool shelf 02 -->
+    <body name ='tool_shelf02' pos ='-0.49 1.665 1.725'>
+      <geom type = 'box' size ='.91 .095 .275' mass='9' material ='metal03'/>
+    </body>
+    <!-- trash can -->
+    <body name='trash_can' pos='1.95 -.8 .215'>
+      <freejoint/>
+      <geom type='cylinder' size='.15 .215' mass='5' material='metal01'/>
+    </body> 
+    
+
+    <!-- <body name="object1" pos="-.02 -0.55 .76">
+      <joint name="object1:joint" type="free"/>
+      <freejoint/>
+      <geom type="box" size=".02 .04 .04" mass=".5" rgba=".2 .2 .5 1"/>
+    </body>
+    <body name="object2" pos=".08 -0.55 .76">
+      <joint name="object2:joint" type="free"/>
+      <freejoint/>
+      <geom type="cylinder" size=".02 .04 .04" mass=".5" rgba=".8 .2 .2 1"/>
+    </body>
+    <body name='object3' pos='.15 -.55 .77'>
+      <joint name="object_03:joint" type="free"/>
+      <freejoint/>
+      <geom type='sphere' size='.03' mass='4' material='wood'/>
+    </body>  -->
+    
+    <site name="target0" pos="-0.10 -0.55 0.78" size="0.01" rgba="1 0 0 1"/>
+
+    <body name="object0" pos="-0.02 -0.55 0.76"> 
+    <joint name="object0:joint" type="free"/>
+    <geom name="object0_geom" type="box" size=".02 .04 .04" mass=".5" rgba=".2 .2 .5 1"/>
+    <site name="object0" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body>
+
+  </worldbody>
+</mujoco>

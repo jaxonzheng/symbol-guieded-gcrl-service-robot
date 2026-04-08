@@ -252,7 +252,8 @@ def stable_contrastive_rl_experiment(
     logging.info('presampled goals kwargs: %r',
                  presampled_goal_kwargs['training_goals_kwargs'],
                  )
-    _, training_context_distrib, _ = contextual_env_distrib_and_reward(
+    # _, training_context_distrib, _ = contextual_env_distrib_and_reward(
+    training_env, training_context_distrib, _ = contextual_env_distrib_and_reward(
         env_id,
         env_class,
         env_kwargs,
@@ -519,27 +520,32 @@ def stable_contrastive_rl_experiment(
         algorithm.post_train_funcs.append(save_paths_fn)
 
     if save_video:
-        assert (num_video_columns * max_path_length <=
-                algo_kwargs['num_expl_steps_per_train_loop'])
-
         expl_save_video_kwargs['include_final_goal'] = True
         eval_save_video_kwargs['include_final_goal'] = True
 
-        expl_video_func = RIGVideoSaveFunction(
-            None,
-            expl_path_collector,
-            'train',
-            image_goal_key=image_goal_key,
-            rows=2,
-            columns=num_video_columns,
-            imsize=imsize,
-            image_format=renderer.output_image_format,
-            unnormalize=True,
-            dump_pickle=save_video_pickle,
-            dump_only_init_and_goal=True,
-            **expl_save_video_kwargs
-        )
-        algorithm.post_train_funcs.append(expl_video_func)
+        num_expl_steps = algo_kwargs['num_expl_steps_per_train_loop']
+        if num_expl_steps > 0:
+            assert (num_video_columns * max_path_length <= num_expl_steps)
+            expl_video_func = RIGVideoSaveFunction(
+                None,
+                expl_path_collector,
+                'train',
+                image_goal_key=image_goal_key,
+                rows=2,
+                columns=num_video_columns,
+                imsize=imsize,
+                image_format=renderer.output_image_format,
+                unnormalize=True,
+                dump_pickle=save_video_pickle,
+                dump_only_init_and_goal=True,
+                **expl_save_video_kwargs
+            )
+            algorithm.post_train_funcs.append(expl_video_func)
+        else:
+            logging.info(
+                "Skipping exploration video saving because "
+                "num_expl_steps_per_train_loop=0."
+            )
 
         if algo_kwargs['num_eval_steps_per_epoch'] > 0:
             eval_video_func = RIGVideoSaveFunction(
@@ -600,4 +606,18 @@ def stable_contrastive_rl_experiment(
         torch.save(data, open(p_path, 'wb'))
 
     logging.info('Start training..')
-    algorithm.train()
+    # algorithm.train()
+    try:
+        algorithm.train()
+    finally:
+        # Close environments explicitly so MuJoCo/EGL teardown happens before
+        # interpreter shutdown, avoiding noisy __del__ EGL errors.
+        for name, env in (
+            ('training', training_env),
+            ('exploration', expl_env),
+            ('evaluation', eval_env),
+        ):
+            try:
+                env.close()
+            except Exception as e:
+                logging.warning('Failed to close %s env cleanly: %s', name, e)

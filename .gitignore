@@ -160,3 +160,31 @@ cython_debug/
 .idea/
 
 config.py
+# Training outputs
+logs/
+runs/
+wandb/
+tensorboard/
+results/
+outputs/
+# Model checkpoints
+checkpoints/
+models/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+# Experiment data
+data/
+datasets/
+demo_data/
+trajectories/
+# Cluster / SLURM
+slurm_logs/
+slurm*.out
+*.out
+*.err
+# IDE / system
+.vscode/
+.idea/
+.DS_Store

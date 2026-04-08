@@ -118,12 +118,33 @@ class Logger(object):
         self.table_printer = TerminalTablePrinter()
 
         self._use_tensorboard = False
+        self._use_wandb = False
         self.epoch = 0
 
         self._save_param_mode = 'torch'
 
     def reset(self):
         self.__init__()
+
+    def enable_wandb(self, project=None, name=None, config=None, **wandb_kwargs):
+        """Initialize Weights & Biases logging."""
+        import wandb
+        if project is None:
+            project = 'Stable_Contrastive_RL'
+        if name is None and self._snapshot_dir is not None:
+            name = osp.basename(self._snapshot_dir)
+        wandb.init(
+            project=project,
+            name=name,
+            config=config or {},
+            **wandb_kwargs,
+        )
+        # Make 'epoch' the default x-axis for all metrics in the W&B UI
+        wandb.define_metric('epoch')
+        wandb.define_metric('eval/num steps total')
+        wandb.define_metric('expl/num steps total')
+        wandb.define_metric('*', step_metric='epoch')
+        self._use_wandb = True
 
     def _add_output(self, file_name, arr, fds, mode='a'):
         if file_name not in arr:
@@ -334,6 +355,25 @@ class Logger(object):
                         self._tabular_header_written.remove(fd)
                         self._tabular_header_written.add(new_fd)
                 self._tabular_fds = new_tabular_fds
+
+            # Log all metrics to Weights & Biases
+            if self._use_wandb:
+                try:
+                    import wandb
+                    wandb_dict = {}
+                    for k, v in tabular_dict.items():
+                        try:
+                            wandb_dict[k] = float(v)
+                        except (ValueError, TypeError):
+                            wandb_dict[k] = v
+                    # Do NOT pass step= here: epochs are negative (-300..0)
+                    # and W&B silently drops records with negative steps.
+                    # 'epoch' is logged as a regular field and set as the
+                    # custom x-axis via define_metric above.
+                    wandb.log(wandb_dict)
+                except Exception as e:
+                    print("WARNING: wandb logging failed: {}".format(e))
+
             del self._tabular[:]
 
     def pop_prefix(self, ):
@@ -405,6 +445,8 @@ def setup_logger(
         log_tabular_only=False,
         log_dir=None,
         tensorboard=False,
+        wandb=False,
+        wandb_kwargs=None,
         unique_id=None,
         git_infos=None,
         script_name=None,
@@ -447,6 +489,15 @@ def setup_logger(
     if tensorboard:
         tensorboard_log_path = osp.join(log_dir, "tensorboard")
         logger.add_tensorboard_output(tensorboard_log_path)
+
+    if wandb:
+        _wandb_kwargs = dict(wandb_kwargs or {})
+        _name = _wandb_kwargs.pop('name', log_dir.split('/')[-1])
+        logger.enable_wandb(
+            name=_name,
+            config=variant,
+            **_wandb_kwargs,
+        )
 
     logger.log("Variant:")
     variant_to_save = variant.copy()

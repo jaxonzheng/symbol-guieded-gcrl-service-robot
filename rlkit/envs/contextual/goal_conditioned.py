@@ -6,6 +6,7 @@ from multiworld.core.multitask_env import MultitaskEnv
 from rlkit.util.io import load_local_or_remote_file
 from rlkit import pythonplusplus as ppp
 from rlkit.core.distribution import DictDistribution
+from rlkit.core.distribution import DictDistributionGenerator
 from rlkit.envs.contextual import ContextualRewardFn
 from rlkit.envs.contextual.contextual_env import Path
 from rlkit.envs.contextual.contextual_env import Diagnostics
@@ -120,6 +121,11 @@ class PresampledPathDistribution(DictDistribution):
             initialize_encodings=True,
     ):
         self._presampled_goals = load_local_or_remote_file(datapath)
+        # Normalize any uint8 image arrays to float32 [0, 1] (new added))---------------------
+        for key in list(self._presampled_goals.keys()):
+            if key.startswith('image') and self._presampled_goals[key].dtype == np.uint8:
+                self._presampled_goals[key] = self._presampled_goals[key].astype(np.float32) / 255.0
+        #---------------------------------------------------------------------------------------------
         self.representation_size = representation_size
         self._num_presampled_goals = self._presampled_goals[list(
             self._presampled_goals)[0]].shape[0]
@@ -148,6 +154,44 @@ class PresampledPathDistribution(DictDistribution):
     @property
     def spaces(self):
         return self.observation_space.spaces
+
+
+class GoalFromContextDistribution(DictDistributionGenerator):
+    """
+    Use goals already present in the current reset observation/context.
+
+    This makes goal images episode-consistent (e.g. same object pose as reset).
+    ContextualEnv calls this as:
+        self.context_distribution(context=obs).sample(1)
+    """
+
+    def __init__(self, observation_space, desired_goal_keys=('image_desired_goal',)):
+        self._desired_goal_keys = tuple(desired_goal_keys)
+        self._spaces = {
+            k: observation_space.spaces[k]
+            for k in self._desired_goal_keys
+        }
+        self._context = None
+
+    def __call__(self, context=None, **kwargs):
+        del kwargs
+        if context is None:
+            raise ValueError("GoalFromContextDistribution requires `context` on __call__.")
+        self._context = context
+        return self
+
+    def sample(self, batch_size: int):
+        if self._context is None:
+            raise RuntimeError("Context is not set. Call distribution(context=obs) first.")
+        sampled_goals = {}
+        for k in self._desired_goal_keys:
+            v = np.asarray(self._context[k])
+            sampled_goals[k] = np.repeat(v[None], batch_size, axis=0)
+        return sampled_goals
+
+    @property
+    def spaces(self):
+        return self._spaces
 
 
 class AddManualImageDistribution(DictDistribution):

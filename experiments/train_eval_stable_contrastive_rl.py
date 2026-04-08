@@ -1,20 +1,118 @@
 import os
 import glob
 
+import gym
+import numpy as np
+from gym import spaces as gym_spaces
+
 from absl import app
 from absl import flags
-
-from roboverse.envs.sawyer_rig_affordances_v6 import SawyerRigAffordancesV6
 
 import rlkit.util.hyperparameter as hyp
 from rlkit.launchers.arglauncher import run_variants
 from rlkit.networks.gaussian_policy import GaussianCNNPolicy
 
-from rlkit.envs.drawer_pnp_push_commands import drawer_pnp_push_commands
 from rlkit.learning.stable_contrastive_rl import stable_contrastive_rl_experiment
 from rlkit.learning.stable_contrastive_rl import process_args
 from rlkit.utils import arg_util
 from rlkit.utils.logging import logger as logging
+
+
+def _no_op_diagnostics(paths, contexts):
+    return {}
+
+
+class GymnasiumToGymWrapper(gym.Env):
+    """
+    Adapts a Gymnasium (5-tuple step) env to old gym (4-tuple step) API.
+    Also converts gymnasium spaces to gym spaces so ClipAction works.
+    Also adds get_image() so EnvRenderer can render from the env.
+    Must be defined at module level so torch.save() can pickle it.
+    """
+    metadata = {}
+
+    def __init__(self, gymnasium_env):
+        self._env = gymnasium_env
+        self.observation_space = self._convert_space(gymnasium_env.observation_space)
+        self.action_space = self._convert_space(gymnasium_env.action_space)
+
+        # Prefer diagnostics from the underlying env if it defines them,
+        # otherwise fall back to no-op.
+        underlying = getattr(gymnasium_env, 'unwrapped', gymnasium_env)
+        if hasattr(underlying, 'get_contextual_diagnostics'):
+            self.get_contextual_diagnostics = underlying.get_contextual_diagnostics
+        elif hasattr(gymnasium_env, 'get_contextual_diagnostics'):
+            self.get_contextual_diagnostics = gymnasium_env.get_contextual_diagnostics
+        else:
+            self.get_contextual_diagnostics = _no_op_diagnostics
+
+        # Don't clobber an existing method on the unwrapped env
+        if hasattr(gymnasium_env, 'unwrapped') and not hasattr(gymnasium_env.unwrapped, 'get_contextual_diagnostics'):
+            gymnasium_env.unwrapped.get_contextual_diagnostics = self.get_contextual_diagnostics
+
+    @staticmethod
+    def _convert_space(space):
+        import gymnasium
+        if isinstance(space, gymnasium.spaces.Box):
+            return gym_spaces.Box(
+                low=space.low, high=space.high,
+                shape=space.shape, dtype=space.dtype)
+        elif isinstance(space, gymnasium.spaces.Dict):
+            return gym_spaces.Dict({
+                k: GymnasiumToGymWrapper._convert_space(v)
+                for k, v in space.spaces.items()
+            })
+        elif isinstance(space, gymnasium.spaces.Discrete):
+            return gym_spaces.Discrete(space.n)
+        else:
+            return space
+
+    @property
+    def unwrapped(self):
+        return self._env.unwrapped
+
+    def reset(self, **kwargs):
+        obs, _info = self._env.reset(**kwargs)
+        return obs
+
+    def set_next_reset_object_pose(self, xyz):
+        """
+        Forward forced object pose to the underlying gymnasium env.
+        """
+        target = getattr(self._env, 'unwrapped', self._env)
+        if hasattr(target, 'set_next_reset_object_pose'):
+            target.set_next_reset_object_pose(xyz)
+
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self._env.step(action)
+        done = terminated or truncated
+        return obs, reward, done, info
+
+    def get_image(self, width=48, height=48):
+        """Called by EnvRenderer._create_image() to render a frame."""
+        img = self._env.unwrapped.mujoco_renderer.render('rgb_array')
+        if img.shape[:2] != (height, width):
+            from PIL import Image as PILImage
+            img = np.array(PILImage.fromarray(img).resize(
+                (width, height), PILImage.BILINEAR))
+        return img  # HWC uint8
+
+    def render(self, mode='human'):
+        return self._env.render()
+
+    def close(self):
+        return self._env.close()
+
+    def seed(self, seed=None):
+        return []
+
+
+class StretchEnvClass:
+    """Shim so rlkit can call env_class(**env_kwargs). Module-level for pickling."""
+    def __new__(cls, **kwargs):
+        from scripts.stretch_env_factory import make_stretch_pick_env_with_images
+        gymnasium_env = make_stretch_pick_env_with_images()
+        return GymnasiumToGymWrapper(gymnasium_env)
 
 
 flags.DEFINE_string('data_dir', './data', '')
@@ -32,18 +130,16 @@ FLAGS = flags.FLAGS
 
 
 def get_paths(data_dir):
-    data_path = 'env6_td_pnp_push_dataset/'
-    data_path = os.path.join(data_dir, data_path)
-    paths = glob.glob(os.path.join(data_path, '*demos.pkl'))
+    data_path = os.path.join(data_dir, 'stretch_align')
+    demo_pkl = os.path.join(data_dir, 'stretch_align_trajectories5-1.pkl')
     demo_paths = [
-        dict(path=path,
+        dict(path=demo_pkl,
              obs_dict=True,
              is_demo=True,
              use_latents=True)
-        for path in paths]
-    # 1054500 transitions in total
+    ]
     logging.info('Number of demonstration files: %d' % len(demo_paths))
-    logging.info('data_path: %s', data_path)
+    logging.info('demo_pkl: %s', demo_pkl)
 
     return data_path, demo_paths
 
@@ -67,13 +163,15 @@ def get_default_variant(demo_paths):
         qf_kwargs=dict(
             hidden_sizes=[1024, 1024, 1024, 1024],
             representation_dim=16,
-            repr_norm=False,
+            # repr_norm=False,
+            repr_norm=True,
             repr_norm_temp=True,
             repr_log_scale=None,
             twin_q=True,
             layer_norm=True,
             img_encoder_arch='cnn',
-            init_w=1E-12,
+            # init_w=1E-12,
+            init_w=3E-3,
         ),
         network_type='contrastive_cnn',
 
@@ -84,7 +182,8 @@ def get_default_variant(demo_paths):
             soft_target_tau=5E-3,
 
             # Contrastive RL default hyperparameters
-            bc_coef=0.05,
+            bc_coef =1.0,
+            # bc_coef=0.05,
             use_td=True,
             entropy_coefficient=0.0,
             target_entropy=0.0,
@@ -93,16 +192,21 @@ def get_default_variant(demo_paths):
             augment_probability=0.5,
         ),
 
-        max_path_length=400,
+        # max_path_length=400, # original
+        max_path_length=75,
         algo_kwargs=dict(
             batch_size=2048,
+            # batch_size=2048, # original
             start_epoch=-300,
-            num_epochs=1,
+            num_epochs=0,  # just do pretraining
+            # num_epochs=1,
 
             num_eval_steps_per_epoch=2000,
-            num_expl_steps_per_train_loop=2000,
+            # num_expl_steps_per_train_loop=2000,
+            num_expl_steps_per_train_loop=0,
             num_trains_per_train_loop=1000,
             num_online_trains_per_train_loop=2000,
+            # num_online_trains_per_train_loop=500,
             min_num_steps_before_training=4000,
 
             eval_epoch_freq=5,
@@ -119,7 +223,7 @@ def get_default_variant(demo_paths):
         reward_kwargs=dict(
             obs_type='image',
             reward_type='sparse',
-            epsilon=2.0,
+            epsilon=6.0,  # image-space L2: same-traj median ~6.1, cross-traj min ~3.6
             terminate_episode=False,
         ),
         online_offline_split_replay_buffer_kwargs=dict(
@@ -137,7 +241,8 @@ def get_default_variant(demo_paths):
                 max_size=int(4E5),
                 neg_from_the_same_traj=False,
             ),
-            sample_online_fraction=0.6
+            sample_online_fraction=0.0
+            # sample_online_fraction=0.6
         ),
 
         save_video=True,
@@ -151,7 +256,8 @@ def get_default_variant(demo_paths):
         ),
 
         path_loader_kwargs=dict(
-            delete_after_loading=True,
+            delete_after_loading=False,
+            # delete_after_loading=True,
             recompute_reward=True,
             demo_paths=demo_paths,
             split_max_steps=None,
@@ -193,6 +299,11 @@ def get_default_variant(demo_paths):
         logger_config=dict(
             snapshot_mode='gap',
             snapshot_gap=50,
+            wandb=True,
+            wandb_kwargs=dict(
+                project='Stable_Contrastive_RL',
+                name=os.environ.get('SLURM_JOB_ID', None),
+            ),
         ),
 
         use_image=True,
@@ -201,7 +312,7 @@ def get_default_variant(demo_paths):
         pretrained_rl_path=None,
 
         eval_seeds=14,
-        num_demos=18,
+        num_demos=9999,  # use all demos in the file
 
         # Video
         num_video_columns=5,
@@ -219,18 +330,8 @@ def get_search_space():
     # Search Space
     ########################################
     search_space = {
-        'env_type': ['td_pnp_push'],
-
-        # Training Parameters
-        # Use first 'num_demos' demos for offline data
-        'num_demos': [20],
-
-        # Reset environment every 'reset_interval' episodes
-        'reset_interval': [1],
-
         # Goals
         'ground_truth_expl_goals': [True],
-
     }
 
     return search_space
@@ -243,23 +344,12 @@ def process_variant(variant, data_path):
         assert variant['algo_kwargs']['start_epoch'] == 0
     if not variant['use_image']:
         assert variant['trainer_kwargs']['augment_probability'] == 0.0
-    env_type = variant['env_type']
-    if env_type == 'pnp':
-        env_type = 'obj'
+    env_type = 'stretch'
 
     ########################################
     # Set the eval_goals.
     ########################################
-    full_open_close_str = ''
-    if 'eval_seeds' in variant.keys():
-        eval_seed_str = f"_seed{variant['eval_seeds']}"
-    else:
-        eval_seed_str = ''
-
-    eval_goals = os.path.join(
-        data_path,
-        'goals_early_stop',
-        f'{full_open_close_str}{env_type}_scripted_goals{eval_seed_str}.pkl')
+    eval_goals = os.path.join(data_path, 'eval_goals5-1.pkl')
     print('eval_goals: ', eval_goals)
 
     ########################################
@@ -294,12 +384,10 @@ def process_variant(variant, data_path):
     ########################################
     # Environments.
     ########################################
-    variant['env_class'] = SawyerRigAffordancesV6
-    variant['env_kwargs']['downsample'] = True
-    variant['env_kwargs']['env_obs_img_dim'] = 196
-    variant['env_kwargs']['test_env_command'] = (
-        drawer_pnp_push_commands[variant['eval_seeds']])
-    variant['env_kwargs']['reset_interval'] = variant['reset_interval']
+    # GymnasiumToGymWrapper and StretchEnvClass are defined at module level
+    # (top of file) so that torch.save() can pickle them.
+    variant['env_class'] = StretchEnvClass
+    variant['env_kwargs'] = {}
 
     ########################################
     # Image.

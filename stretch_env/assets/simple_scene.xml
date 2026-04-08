@@ -1,0 +1,227 @@
+<mujoco model="stretch scene">
+  <include file="stretch.xml"/>
+
+  <statistic center="0 0 2.0" extent="1.5" meansize="0.05"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="2d" name="wood" file="materials/wood.png"/>
+    <material name="wood" texture="wood"/>
+    <texture type="2d" name="metal01" file="materials/metal01.png"/>
+  
+    <material name="metal01" texture="metal01"/>
+    <texture type="2d" name="wallpaper" file="materials/wallpaper.png"/>
+    <material name="wallpaper" texture="wallpaper"/>
+    <texture type="2d" name="metal02" file="materials/metal02.png"/>
+    <material name="metal02" texture="metal02"/>
+    <texture type="2d" name="metal03" file="materials/metal03.png"/>
+    <material name="metal03" texture="metal03"/>
+    <texture type="2d" name="wool" file="materials/wool.png"/>
+    <material name="wool" texture="wool"/>
+    <texture type="2d" name="glass" file="materials/glass.png"/>
+    <material name="glass" texture="glass"/>
+    <mesh name="real_table" file="materials/desk.obj" scale="1 1 1"/>
+    <material name="real_table_material" rgba="1 1 1 1"/>
+
+    <material name="floor" rgba="1.0 0.5 0.1 1" texture="wood"/>
+    <material name="object" rgba=".2 .2 .2 1"/>
+    <texture type="skybox" builtin="gradient" rgb1="0.44 0.80 1.00" rgb2="1 1 1" width="512" height="3072"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="floor"/>
+    
+    <!-- Fixed external camera: TOP-DOWN view above table center -->
+    <!-- Table center is at (0.0, -0.7, 0.72) - surface height -->
+    <!-- Camera positioned directly above, looking straight down -->
+    <!-- pos: x=0 (table center X), y=-0.7 (table center Y), z=1.5 (elevated above) -->
+    <!-- quat: (1, 0, 0, 0) = looking straight down (identity rotation then rotated) -->
+    <!-- Using xyaxes for precise control: X-right, Y-back, Z-down -->
+    <camera name="table_view" pos="0.0 -0.4 2.5" xyaxes="1 0 0 0 1 0" fovy="45"/>
+    
+    <!-- Fixed external camera: LEFT-FRONT view -->
+    <!-- Positioned on the left-front side and oriented toward table center (0.0, -0.55, 0.72). -->
+    <!-- xyaxes are orthonormalized so Z points toward the workspace and Y stays mostly up. -->
+    <camera name="left_front_view" pos="0.7 -0.9 1.4" xyaxes="0.707 0.707 0 -0.438 0.438 0.785" fovy="45"/>
+
+
+    <camera name="right_bottom_view" pos="-0.8 -0.3 1.25" xyaxes="-0.298 -0.955 0 0.511 -0.159 0.845" fovy="42"/>
+
+    <!-- Fixed external camera: in front of head camera, tilted down toward table -->
+    <!-- Position is slightly in front of the robot head area, above workspace -->
+    <!-- Oriented to look down toward table center (0.0, -0.55, 0.72) -->
+    <camera name="head_front_down_view" pos="0.0 -0.1 1.55" xyaxes="-1 0 0 0 -0.998 0.430" fovy="45"/>
+    <!-- camera 4 -->
+    <camera name="side_view" pos="0.95 0.0 1.5" xyaxes="-0.644 0.765 0 -0.356 -0.300 0.885" fovy="42"/>
+    
+    <!-- robot table -->
+    <body name="table" pos="0.0 -0.55 .36"> 
+      <geom type="box" size=".4 .15 .36" mass="1" material="metal01"/>
+    </body>
+    <!-- target mocap body -->
+    <body name="target0" mocap="true" pos="0 0 0.9">
+      <site name="target0_site" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+    </body>
+
+    <!-- 20 objects - boxes and cylinders only for better grasping -->
+    <!-- Object 0: Blue Box -->
+    <body name="object0" pos="0.0 -0.42 0.76"> 
+      <joint name="object0:joint" type="free"/>
+      <geom name="object0" type="box" size=".02 .04 .04" mass=".5" rgba=".2 .2 .8 1"/>
+      <site name="object0" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body>
+
+    <!-- Objects 1-19: Commented out for single-object training -->
+    
+    <!-- Object 1: Red Box (was sphere) -->
+    <!-- <body name="object1" pos="0.1 -0.7 0.76"> 
+      <joint name="object1:joint" type="free"/>
+      <geom name="object1" type="box" size=".03 .03 .03" mass=".5" rgba=".8 .2 .2 1"/>
+      <site name="object1" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 2: Green Cylinder -->
+    <!-- <body name="object2" pos="0.2 -0.7 0.76"> 
+      <joint name="object2:joint" type="free"/>
+      <geom name="object2" type="cylinder" size=".025 .04" mass=".5" rgba=".2 .8 .2 1"/>
+      <site name="object2" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 3: Yellow Box -->
+    <!-- <body name="object3" pos="-0.1 -0.7 0.76"> 
+      <joint name="object3:joint" type="free"/>
+      <geom name="object3" type="box" size=".03 .03 .03" mass=".5" rgba=".8 .8 .2 1"/>
+      <site name="object3" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 4: Purple Cylinder (was sphere) -->
+    <!-- <body name="object4" pos="-0.2 -0.7 0.76"> 
+      <joint name="object4:joint" type="free"/>
+      <geom name="object4" type="cylinder" size=".035 .035" mass=".5" rgba=".6 .2 .8 1"/>
+      <site name="object4" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 5: Orange Cylinder -->
+    <!-- <body name="object5" pos="0.0 -0.8 0.76"> 
+      <joint name="object5:joint" type="free"/>
+      <geom name="object5" type="cylinder" size=".02 .05" mass=".5" rgba=".9 .5 .2 1"/>
+      <site name="object5" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 6: Cyan Box -->
+    <!-- <body name="object6" pos="0.1 -0.8 0.76"> 
+      <joint name="object6:joint" type="free"/>
+      <geom name="object6" type="box" size=".025 .025 .05" mass=".5" rgba=".2 .8 .8 1"/>
+      <site name="object6" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 7: Pink Box (was sphere) -->
+    <!-- <body name="object7" pos="0.2 -0.8 0.76"> 
+      <joint name="object7:joint" type="free"/>
+      <geom name="object7" type="box" size=".028 .028 .028" mass=".5" rgba=".9 .5 .7 1"/>
+      <site name="object7" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 8: Brown Box -->
+    <!-- <body name="object8" pos="-0.1 -0.8 0.76"> 
+      <joint name="object8:joint" type="free"/>
+      <geom name="object8" type="box" size=".035 .02 .04" mass=".5" rgba=".6 .4 .2 1"/>
+      <site name="object8" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 9: Lime Cylinder -->
+    <!-- <body name="object9" pos="-0.2 -0.8 0.76"> 
+      <joint name="object9:joint" type="free"/>
+      <geom name="object9" type="cylinder" size=".03 .035" mass=".5" rgba=".6 .9 .2 1"/>
+      <site name="object9" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 10: Magenta Box -->
+    <!-- <body name="object10" pos="0.0 -0.6 0.76"> 
+      <joint name="object10:joint" type="free"/>
+      <geom name="object10" type="box" size=".04 .03 .02" mass=".5" rgba=".9 .2 .6 1"/>
+      <site name="object10" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 11: Teal Cylinder (was sphere) -->
+    <!-- <body name="object11" pos="0.1 -0.6 0.76"> 
+      <joint name="object11:joint" type="free"/>
+      <geom name="object11" type="cylinder" size=".032 .032" mass=".5" rgba=".2 .6 .6 1"/>
+      <site name="object11" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 12: Navy Cylinder -->
+    <!-- <body name="object12" pos="0.2 -0.6 0.76"> 
+      <joint name="object12:joint" type="free"/>
+      <geom name="object12" type="cylinder" size=".022 .045" mass=".5" rgba=".2 .2 .5 1"/>
+      <site name="object12" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 13: Coral Box -->
+    <!-- <body name="object13" pos="-0.1 -0.6 0.76"> 
+      <joint name="object13:joint" type="free"/>
+      <geom name="object13" type="box" size=".028 .04 .035" mass=".5" rgba=".9 .6 .5 1"/>
+      <site name="object13" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 14: Lavender Box (was sphere) -->
+    <!-- <body name="object14" pos="-0.2 -0.6 0.76"> 
+      <joint name="object14:joint" type="free"/>
+      <geom name="object14" type="box" size=".027 .027 .027" mass=".5" rgba=".7 .6 .9 1"/>
+      <site name="object14" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 15: Olive Cylinder -->
+    <!-- <body name="object15" pos="0.05 -0.75 0.76"> 
+      <joint name="object15:joint" type="free"/>
+      <geom name="object15" type="cylinder" size=".028 .038" mass=".5" rgba=".5 .5 .2 1"/>
+      <site name="object15" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 16: Maroon Box -->
+    <!-- <body name="object16" pos="-0.05 -0.75 0.76"> 
+      <joint name="object16:joint" type="free"/>
+      <geom name="object16" type="box" size=".032 .028 .042" mass=".5" rgba=".6 .2 .2 1"/>
+      <site name="object16" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 17: Mint Box (was sphere) -->
+    <!-- <body name="object17" pos="0.15 -0.75 0.76"> 
+      <joint name="object17:joint" type="free"/>
+      <geom name="object17" type="box" size=".033 .033 .033" mass=".5" rgba=".6 .9 .7 1"/>
+      <site name="object17" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 18: Gold Box -->
+    <!-- <body name="object18" pos="-0.15 -0.75 0.76"> 
+      <joint name="object18:joint" type="free"/>
+      <geom name="object18" type="box" size=".038 .022 .038" mass=".5" rgba=".9 .7 .2 1"/>
+      <site name="object18" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+    <!-- Object 19: Indigo Cylinder -->
+    <!-- <body name="object19" pos="0.0 -0.65 0.76"> 
+      <joint name="object19:joint" type="free"/>
+      <geom name="object19" type="cylinder" size=".024 .042" mass=".5" rgba=".3 .2 .6 1"/>
+      <site name="object19" pos="0 0 0" size="0.005" rgba="0 1 0 1"/>
+    </body> -->
+
+  </worldbody>
+
+  <equality>
+    <!-- Weld gripper to object0 for goal generation (to compute valid robot pose holding object) -->
+    <weld name="gripper_object_weld" body1="ee_body" body2="object0" active="false" solref="0.02 1"/>
+    <weld name="gripper_target_weld" body1="ee_body" body2="target0" active="false" solref="0.02 1"/>
+  </equality>
+
+</mujoco>
+
+  
+
+  

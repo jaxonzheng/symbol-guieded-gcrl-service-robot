@@ -122,10 +122,50 @@ class ContextualEnv(gym.Wrapper):
 
         self.unbatched_reward_fn = unbatched_reward_fn
 
+    def _maybe_set_reset_object_pose(self, context_batch):
+        """
+        If the sampled context includes object coordinates, push them into env
+        before reset so the rollout scene matches the sampled goal.
+        """
+        if not hasattr(self.env, 'set_next_reset_object_pose'):
+            return
+
+        pose = None
+        for key in ('reset_object_xyz', 'object_xyz'):
+            if key in context_batch:
+                pose_arr = np.asarray(context_batch[key])
+                if pose_arr.ndim == 2:
+                    pose = pose_arr[0]
+                elif pose_arr.ndim == 1:
+                    pose = pose_arr
+                break
+
+        if pose is not None:
+            self.env.set_next_reset_object_pose(pose)
+
     def reset(self):
-        obs = self.env.reset()
-        self._curr_context = self._context_distribution(
-            context=obs).sample(1)
+        # Preferred flow for presampled goals that include object coordinates:
+        # sample context first, then reset so reset() can use those coordinates.
+        context_keys = set(self._context_distribution.spaces.keys())
+        has_reset_pose = (
+            'reset_object_xyz' in context_keys or 'object_xyz' in context_keys
+        )
+        sampled_without_obs = False
+        if has_reset_pose:
+            try:
+                self._curr_context = self._context_distribution.sample(1)
+                sampled_without_obs = True
+            except Exception:
+                sampled_without_obs = False
+
+        if sampled_without_obs:
+            self._maybe_set_reset_object_pose(self._curr_context)
+            obs = self.env.reset()
+        else:
+            obs = self.env.reset()
+            self._curr_context = self._context_distribution(
+                context=obs).sample(1)
+
         self._add_context_to_obs(obs)
         self._last_obs = obs
         return obs
