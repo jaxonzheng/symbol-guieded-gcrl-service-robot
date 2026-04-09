@@ -94,4 +94,4 @@ pip install pyyaml
 ## Questions?
 For questions about the **original SCRL**, please reach out to Chongyi Zheng (chongyiz@princeton.edu).
 
-For questions about the **Stretch integration**, please reach out to Jaxon (jaxon.cheng@ml.rwth-aachen.de).
+For questions about the **Stretch Robot integration**, please reach out to Jaxon (jaxon.cheng@ml.rwth-aachen.de).
